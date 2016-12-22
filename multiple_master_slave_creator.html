@@ -48,6 +48,10 @@ ul
     padding-top: 1em;
     margin-bottom: 1em;
 }
+.step3:hover
+{
+	background-color: lightgreen;
+}
 .pointer {
 	cursor: pointer;
 }
@@ -263,6 +267,9 @@ function buildListItems(xmlDoc)
 /* Step 2 GUI - Create and show the Create Master button */
 function enableStep2GUI()
 {
+	// Hide "Create Master Nodes" button
+	document.getElementById("fileUpload").style.display="none";
+	
 	var dropMasterDiv = document.createElement("div");
 	var dropMasterDivText = document.createTextNode("Step 2: Create Master Node"); 
 	dropMasterDiv.appendChild(dropMasterDivText);
@@ -275,7 +282,7 @@ function enableStep2GUI()
 	document.body.appendChild(dropMasterDiv);
 }
 
-/* Step 4 GUI - Create and show Write Dashboard button */
+/* Step 3 GUI - Create and show Write Dashboard button */
 function enableStep3GUI()
 {
 	// Hide "Create Master Nodes" button
@@ -286,14 +293,17 @@ function enableStep3GUI()
 	writeMasterDiv.appendChild(writeMasterDivText);
 	writeMasterDiv.setAttribute("onclick","processDashboard()");
 	writeMasterDiv.setAttribute("id","processBtn");
-	writeMasterDiv.setAttribute("class","button pointer");
+	writeMasterDiv.setAttribute("class","button pointer step3");
 	
 	document.body.appendChild(writeMasterDiv);
 }
 
-/* Step 5 GUI - Process XML and create download link */
+/* Step 4 GUI - Process XML and create download link */
 function processDashboard()
 {
+	// Hide "Create Master Nodes" button
+	document.getElementById("processBtn").style.display="none";
+	
 	processXML(); //This is where the XML transformations occur.
 	
 	var xmlText = new XMLSerializer().serializeToString(xmlDoc);
