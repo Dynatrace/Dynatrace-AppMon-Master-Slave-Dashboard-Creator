@@ -1,0 +1,422 @@
+<!DOCTYPE HTML>
+<html>
+<head>
+
+<style>
+body
+{
+	font-family: sans-serif;
+}
+ul
+{
+	list-style-type: none; 
+    list-style-image: none;
+	-webkit-padding-start: 0px;
+}
+.downloadLink
+{
+	display: block;
+}
+.downloadLink:hover
+{
+	border: 1px dashed green;
+	background-color: lightgreen;
+}
+#dashletList li
+{
+	margin: 5px;
+    padding: 10px;
+    background: #eee;
+    font-weight: bold;
+    border-radius: 5px;
+    text-align: center;
+}
+#dashletList li:hover
+{
+	border: 1px dashed green;
+	background-color: lightgreen;
+}
+.button
+{
+	width: 40%;
+    height: 50px;
+    margin: auto;
+    border: 1px dashed #000;
+    border-radius: 0.5em;
+    font-size: x-large;
+    text-align: center;
+    padding-top: 1em;
+    margin-bottom: 1em;
+}
+.pointer {
+	cursor: pointer;
+}
+.dragOver
+{
+	border: 1px dashed green;
+	background-color: lightgreen;
+}
+#fileUpload:hover
+{
+	border: 1px dashed green;
+	background-color: lightgreen;
+}
+#uploadBox
+{
+	display:none;
+}
+input
+{
+	display: none;
+}
+#instructions
+{
+	width: 70%;
+	margin-top: 0.5em;
+	margin-bottom: 0.5em;
+	margin-left: auto;
+	margin-right: auto;
+	padding: 5px;
+	border: 1px solid grey;
+	border-radius: 0.2em;
+	background: #eee;
+}
+h1
+{
+	width: 50%;
+	margin: auto;
+}
+
+</style>
+<script>
+var draggedElement;
+var masterMap = new Map();
+var xmlDoc = null;
+var bHaveSlaves = false;
+
+/* ondragover */
+function allowDrop(ev)
+{
+	
+	// If the target is one of the buttons, set the dragOver class.
+	// Not performing this check makes other master dashboards a button.
+	if (ev.target.classList.contains("button"))
+	{
+		ev.target.setAttribute("class","button dragOver");
+	}
+	else
+	{
+		ev.target.setAttribute("class","dragOver");
+	}
+	
+    ev.preventDefault();
+}
+
+/* ondragleave */
+function dragLeave(ev)
+{
+	//ev.target.removeAttribute("class","dragOver");
+	// Only set back to a button if it was already a button
+	if (ev.target.classList.contains("button"))
+	{
+		ev.target.setAttribute("class","button"); // Set back to the standard button look-and-feel
+	}
+	else
+	{
+		ev.target.removeAttribute("class","dragOver");
+	}
+	ev.preventDefault();
+}
+
+function dragMaster(ev)
+{
+	draggedElement = ev.target;
+}
+
+function dropMaster(ev) {
+    ev.preventDefault();
+	
+	// Remove the list item from the UL
+	draggedElement.parentNode.removeChild( draggedElement );
+
+	// Create a new master item
+	var newDiv = document.createElement("h3");
+	var divText = document.createTextNode(draggedElement.innerHTML);
+	newDiv.setAttribute("class","masterNode");
+	newDiv.setAttribute("ondragover","allowDrop(event)");
+	newDiv.setAttribute("ondragleave","dragLeave(event)");
+	newDiv.setAttribute("ondrop","subDropEvent(event)");
+	newDiv.appendChild(divText);
+
+  // add the newly created element and its content into the DOM 
+  var currentDiv = document.getElementById("createMasterNodes"); 
+  document.body.insertBefore(newDiv, currentDiv);
+  
+  // Add to masterMap
+  masterMap.set(draggedElement.innerHTML,null);
+  
+  var unorderedList = document.getElementById("dashletList");
+  if (unorderedList.getElementsByTagName('li').length == 0)
+ {
+	enableStep3GUI();
+ }
+ 
+ // Also unset the div colour
+ dragLeave(ev);
+}
+
+function subDropEvent(ev)
+{
+	bHaveSlaves = true;
+	
+	// Add an indication that this is a sub element
+	if (draggedElement.classList.contains("sub-element"))
+	{
+		var parent = findKeyForVal(draggedElement.innerHTML);
+		/* Dragging onto new master will add it to the masterMap
+		 * So all we need to do is remove from parent
+		 */
+		var array = masterMap.get(parent);
+		var index = array.indexOf(draggedElement.innerHTML);
+		array.splice(index,1);
+
+	}
+	
+	draggedElement.setAttribute("class","sub-element");
+	
+	insertAfter(draggedElement,ev.target);
+
+	var draggedElementText = draggedElement.innerHTML;
+	var dragTargetText = ev.target.innerHTML;
+	
+	// Get Array for key and add element
+	var values = masterMap.get(dragTargetText);
+	
+	// First sub drop element, array will be null
+	// Subsequent sub drop elements, we can push
+	if (values == null) masterMap.set(dragTargetText,new Array(draggedElementText));
+	else values.push(draggedElementText);
+	
+	var unorderedList = document.getElementById("dashletList");
+	if (unorderedList.getElementsByTagName('li').length == 0)
+	{
+		enableStep3GUI();
+	}
+	
+	// Also unset the div colour
+	dragLeave(ev);
+}
+
+function processUpload()
+{
+	var files = document.getElementById("uploadBox").files; // FileList object
+
+	var fileReader = new FileReader();
+	var parser = new DOMParser();
+	
+	fileReader.onloadend = function()
+	{
+            var xmlData = fileReader.result;
+			xmlDoc = parser.parseFromString(xmlData,"text/xml");
+			
+			// Create GUI
+			buildListItems(xmlDoc);
+			
+    };
+		
+    // files is a FileList of File objects. List some properties.
+    var output = [];
+    for (var i = 0, f; f = files[i]; i++)
+	{
+		fileReader.readAsText(f);
+	}
+}
+
+/* Step 1 - Build list item after file upload */
+function buildListItems(xmlDoc)
+{
+	var dashletList = xmlDoc.getElementsByTagName("portletconfig");
+	
+	// Clear existing GUI (UL and result DIV)
+	var unorderedList = document.getElementById("dashletList");
+	unorderedList.innerHTML = "";
+	var resultDIV = document.getElementById("resultList");
+	resultDIV.innerHTML = "";
+	
+	// For each dashlet
+	for (var i = 0; i <dashletList.length; i++)
+	{
+		var dashlet = dashletList[i];
+		
+		var listItem = document.createElement("li"); 
+		listItem.setAttribute("class","pointer");
+		listItem.setAttribute("draggable","true");
+		listItem.setAttribute("ondrag","dragMaster(event)"); 
+		var listText = document.createTextNode(dashlet.getAttribute("name")); 
+		listItem.appendChild(listText);
+		unorderedList.appendChild(listItem);
+	}
+	
+	enableStep2GUI()
+}
+
+/* Step 2 GUI - Create and show the Create Master button */
+function enableStep2GUI()
+{
+	var dropMasterDiv = document.createElement("div");
+	var dropMasterDivText = document.createTextNode("Step 2: Create Master Node"); 
+	dropMasterDiv.appendChild(dropMasterDivText);
+	dropMasterDiv.setAttribute("ondrop","dropMaster(event)");
+	dropMasterDiv.setAttribute("id","createMasterNodes");
+	dropMasterDiv.setAttribute("class","button pointer");
+	dropMasterDiv.setAttribute("ondragover","allowDrop(event)");
+	dropMasterDiv.setAttribute("ondragleave","dragLeave(event)");
+	
+	document.body.appendChild(dropMasterDiv);
+}
+
+/* Step 4 GUI - Create and show Write Dashboard button */
+function enableStep3GUI()
+{
+	// Hide "Create Master Nodes" button
+	document.getElementById("createMasterNodes").style.display="none";
+	
+	var writeMasterDiv = document.createElement("div");
+	var writeMasterDivText = document.createTextNode("Step 3: Process Dashboad"); 
+	writeMasterDiv.appendChild(writeMasterDivText);
+	writeMasterDiv.setAttribute("onclick","processDashboard()");
+	writeMasterDiv.setAttribute("id","processBtn");
+	writeMasterDiv.setAttribute("class","button pointer");
+	
+	document.body.appendChild(writeMasterDiv);
+}
+
+/* Step 5 GUI - Process XML and create download link */
+function processDashboard()
+{
+	processXML(); //This is where the XML transformations occur.
+	
+	var xmlText = new XMLSerializer().serializeToString(xmlDoc);
+	
+	var a = document.createElement("a");
+	a.setAttribute("class","button pointer downloadLink");
+	var blob = new Blob([xmlText], {type: "text/xml"});
+	var url = window.URL.createObjectURL(blob);
+	a.href = url;
+	a.download = "output_master_slave.dashboard.xml";
+	a.text = "Step 4: Save Dashboard File"
+
+	document.body.appendChild(a);
+}
+
+function processXML()
+{
+	// If we have no slave nodes. Stop processing.
+	if (!bHaveSlaves)
+	{
+		alert("Warning: No slaves. Processing stopped. Please refresh page and try again.");
+		return;
+	}
+	
+	var dashletList = xmlDoc.getElementsByTagName("portletconfig");
+	
+	// For each dashlet
+	for (var i = 0; i <dashletList.length; i++)
+	{
+		var dashlet = dashletList[i];
+		var dashletName = dashlet.getAttribute('name');
+		
+		if (masterMap.has(dashletName)) // Set dashlet to be a master
+		{
+			// Get this dashlets ID.
+			var masterDashletID = dashlet.getAttribute('id');
+			
+			// Set this as a master dashlet
+			dashlet.setAttribute('ismaster','true');
+			
+			// Get the intended slaves for this dashlet
+			var slaveNameList = masterMap.get(dashletName);
+			if (slaveNameList == null) continue;
+			
+			for (var slaveDashletName of slaveNameList)
+			{
+				var slaveDashletXML = getDashlet(slaveDashletName);
+				if (slaveDashletXML != null)
+				{
+					/* Fix duplicate <masterreference> node bug
+					 * If one is already there, don't add another one.
+					 * Perhaps this tool should remove any existing nodes and add our own?
+					 */
+					 var bHasExistingMasterReference = false;
+					 for (var childNode of slaveDashletXML.childNodes)
+					 {
+						if (childNode.tagName == "masterreference")
+						{
+							bHasExistingMasterReference = true;
+						}
+					 }
+					 
+					if (!bHasExistingMasterReference)
+					{
+						var masterRefElem = xmlDoc.createElement("masterreference");
+						masterRefElem.setAttribute("portletid",masterDashletID);
+						slaveDashletXML.appendChild(masterRefElem);
+					}
+				}
+			}
+		} // end if master map has master dashboard
+	} // end for each dashlet loop
+}
+
+function getDashlet(dashletName)
+{
+	var dashletList = xmlDoc.getElementsByTagName("portletconfig");
+	for (i = 0; i <dashletList.length; i++)
+	{
+		var dashlet = dashletList[i];
+		var dashletNameVar = dashlet.getAttribute('name');
+		if (dashletNameVar == dashletName)
+		{
+			return dashlet;
+		}
+	} // end for loop
+	return null;
+}
+
+/* Helper functions */
+function insertAfter(el, referenceNode) {
+    referenceNode.parentNode.insertBefore(el, referenceNode.nextSibling);
+}
+function findKeyForVal(strVal)
+{
+	for (key of masterMap.keys())
+	{
+		if (key == null) continue;
+		if (masterMap.get(key).includes(strVal))
+		{
+			return key;
+		}
+	}
+	return null;
+}
+</script>
+</head>
+<body>
+<h1>Master / Slave Dashboard Creator</h1>
+<p id="instructions">
+1. Upload <strong>dashboard.xml file</strong><br />
+2. To create a <em><strong>master node</strong></em>, click & drag the node onto the <strong>Create Master Node</strong> button.<br />
+&nbsp;&nbsp;- To create a <em><strong>slave node</strong></em>, click and drag the node onto <strong>an existing master node.</strong><br />
+3. Click the <strong>Process Dashboard</strong> button to generate the new dashboard<br />
+4. Click the <strong></strong> button to download the <em>output_master_slave.dashboard.xml</em>, rename as appropriate and open in client.
+</p>
+
+<div id="fileUpload" class="button pointer" onclick="document.getElementById('uploadBox').click()">Step 1: Upload your dashboard XML file<input type="file" id="uploadBox" accept=".dashboard.xml" onchange="processUpload()"></div>
+<input type="file" />
+<ul id="dashletList">
+</ul>
+
+<div id="resultList"></div>
+
+</body>
+</html>
