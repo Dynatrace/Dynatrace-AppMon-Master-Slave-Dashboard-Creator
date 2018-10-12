@@ -15,4 +15,4 @@ Download the [latest release](https://github.com/Dynatrace/Master-Slave-Dashboar
 4. Click *Save Dashboard File*. A new dashboard will be downloaded via your browser.
 5. Rename as appropriate & open your new * *_master_slave.dashboard.xml* in AppMon.
 
-Problems, issues or questions? Please post on the the [Dynatrace Community Forum](https://answers.dynatrace.com/spaces/148/index.html) or contact the author: adam.gardner@dynatrace.com
+Problems, issues or questions? Please post on the [Dynatrace Community Forum](https://answers.dynatrace.com/spaces/148/index.html) or contact the author: adam.gardner@dynatrace.com
